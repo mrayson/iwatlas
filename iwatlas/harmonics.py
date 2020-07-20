@@ -24,6 +24,7 @@ $$
 """
 
 import numpy as np
+import pandas as pd
 
 from soda.utils.harmonic_analysis import harmonic_fit_array
 
@@ -96,3 +97,91 @@ def seasonal_amp(a_hat, b_hat, a_tilde, b_tilde, t, omega_A=twopi/(365*tdaysec))
             A_im[ff,:] += a_tilde[ff,n]*np.cos(n*omega_A*t) + b_tilde[ff,n]*np.sin(n*omega_A*t)
     
     return A_re, A_im
+
+def short_time_harmonic_fit(X, tnew, frq, window):
+    """
+    Short time harmonic fit using frequencies in 'frq'
+
+    window is time window in pandas notation e.g. '30D' = 30 days
+    """
+    # Break the time series up into chunks
+    trange = pd.date_range(tnew[0],tnew[-1],freq=window).values
+    tmid = trange[0:-1] + 0.5*(trange[1:]-trange[0:-1])
+
+    tindex = np.zeros(tnew.shape, np.int)
+    ii=0
+    for t1,t2 in zip(trange[0:-1], trange[1:]):
+        idx = (tnew>=t1) & (tnew<=t2)
+        #print(t1,t2,sum(idx))
+
+        tindex[idx] = ii
+        ii+=1
+
+    # Go through and do the fitting using least-squares
+    nfrq = len(frq)
+
+    tsec = SecondsSince(tnew)
+    tseclow = SecondsSince(tmid)
+
+    nt = tsec.shape[0]
+    ntlow = tseclow.shape[0]
+
+    # 1) Fit the tide harmonics to each 30 d block
+    aa = np.zeros((ntlow,))
+    Aa = np.zeros((ntlow, nfrq))
+    Ba = np.zeros((ntlow, nfrq))
+
+    for ii in range(ntlow):
+        idx = tindex == ii
+        Y = harmonic_fit_array(X[idx], tsec[idx], frq, axis=0)
+        aa[ii] = Y[0]
+        Aa[ii,:] = Y[1::2]
+        Ba[ii,:] = Y[2::2]
+    
+    return aa, Aa, Ba, tsec, tseclow, tmid
+
+def lowfreq_harmonic_fit(Aa, Ba, tseclow, frqlow, frq, tsec):
+    """
+    Fit low frequency harmonics to the real and imaginary amplitudes in Aa and Ba
+
+    Return a prediction of the amplitude at time=tsec
+    """
+    nfrq = len(frq)
+    nfrqlow = len(frqlow)
+    
+    # 2) Fit the low-frequency harmonics to these harmonics
+    aa_l_r = np.zeros((nfrq,))
+    Aa_l_r = np.zeros((nfrqlow,nfrq))
+    Ba_l_r = np.zeros((nfrqlow,nfrq))
+
+    aa_l_i = np.zeros((nfrq,))
+    Aa_l_i = np.zeros((nfrqlow,nfrq))
+    Ba_l_i = np.zeros((nfrqlow,nfrq))
+
+    #Y = harmonic_fit_array(aa, tseclow, frqlow, axis=0)
+    #aa_l_r[:] = Y[1::2]
+    #aa_l_i[:] = Y[2::2]
+
+    Y = harmonic_fit_array(Aa, tseclow, frqlow, axis=0)
+    aa_l_r[:] = Y[0,:]
+    Aa_l_r[:] = Y[1::2,:]
+    Aa_l_i[:] = Y[2::2,:]
+
+    Y = harmonic_fit_array(Ba, tseclow, frqlow, axis=0)
+    aa_l_i[:] = Y[0,:]
+    Ba_l_r[:] = Y[1::2,:]
+    Ba_l_i[:] = Y[2::2,:]
+
+    ## Prediction
+    # 3) Build the tidal harmonics as a time-series
+    nt = tsec.shape[0]
+    Aa_pred = np.zeros((nt,nfrq))
+    Ba_pred = np.zeros((nt,nfrq))
+
+    for ii in range(nfrq):
+        Aa_pred[:,ii] = harmonic_pred(aa_l_r[ii], Aa_l_r[:,ii], Aa_l_i[:,ii], frqlow, tsec)
+        Ba_pred[:,ii] = harmonic_pred(aa_l_i[ii], Ba_l_r[:,ii], Ba_l_i[:,ii], frqlow, tsec)
+        
+    return Aa_pred, Ba_pred 
+
+  
