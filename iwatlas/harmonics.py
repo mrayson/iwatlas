@@ -90,18 +90,24 @@ def seasonal_amp(a_hat, b_hat, a_tilde, b_tilde, t, omega_A=twopi/(365*tdaysec))
     """
     Calculate the real and imaginary modulated (seasonal) amplitudes
     """
-    nf, na = a_hat.shape
+    if a_hat.ndim==2:
+        nf, na = a_hat.shape
+        nc = 0
+    elif a_hat.ndim==3:
+        nf, na, nc = a_hat.shape
+        
     nt = t.shape[0]
 
-    A_re = np.zeros((nf,nt))
-    A_im = np.zeros((nf,nt))
+    A_re = np.zeros((nf,nt,nc))
+    A_im = np.zeros((nf,nt,nc))
 
     for ff in range(nf):
         for n in range(na):
-            A_re[ff,:] += a_hat[ff,n]*np.cos(n*omega_A*t) + b_hat[ff,n]*np.sin(n*omega_A*t)
-            A_im[ff,:] += a_tilde[ff,n]*np.cos(n*omega_A*t) + b_tilde[ff,n]*np.sin(n*omega_A*t)
-    
+            A_re[ff,...] += a_hat[ff,n,...]*np.cos(n*omega_A*t[:,None]) + b_hat[ff,n,...]*np.sin(n*omega_A*t[:,None])
+            A_im[ff,...] += a_tilde[ff,n,...]*np.cos(n*omega_A*t[:,None]) + b_tilde[ff,n,...]*np.sin(n*omega_A*t[:, None])
+
     return A_re, A_im
+
 
 def short_time_harmonic_fit(X, tnew, frq, window):
     """
