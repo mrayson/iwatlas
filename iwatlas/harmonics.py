@@ -63,21 +63,26 @@ def harmonic_to_seasonal(Aa, Ba, na, ntide):
     assert Aa.shape[0] == (ntide)*(2*na+1)
     assert Ba.shape[0] == (ntide)*(2*na+1)
 
-    alpha_hat = np.zeros((ntide,(na+1)))
-    alpha_tilde = np.zeros((ntide,(na+1)))
-    beta_hat = np.zeros((ntide,(na+1)))
-    beta_tilde = np.zeros((ntide,(na+1)))
+    if Aa.ndim = 1:
+        nc = 0
+    else:
+        nc = Aa.shape[-1]
+
+    alpha_hat = np.zeros((ntide,(na+1), nc))
+    alpha_tilde = np.zeros((ntide,(na+1),nc))
+    beta_hat = np.zeros((ntide,(na+1), nc))
+    beta_tilde = np.zeros((ntide,(na+1), nc))
 
     for ff in range(ntide):
         ii = (ff+1)*(2*na+1)-na-1 # Location of the fixed harmonic
 
-        alpha_hat[ff,0] = Aa[ii]
-        alpha_tilde[ff,0] = Ba[ii]
+        alpha_hat[ff,0,...] = Aa[ii,...]
+        alpha_tilde[ff,0,...] = Ba[ii,...]
         for n in range(1,na+1):
-            alpha_hat[ff,n] = Aa[ii-n] + Aa[ii+n]
-            beta_hat[ff,n] = Ba[ii+n] - Ba[ii-n]
-            alpha_tilde[ff,n] = Ba[ii-n] + Ba[ii+n]
-            beta_tilde[ff,n] = Aa[ii-n]-Aa[ii+n]  
+            alpha_hat[ff,n,...] = Aa[ii-n,...] + Aa[ii+n,...]
+            beta_hat[ff,n,...] = Ba[ii+n,...] - Ba[ii-n,...]
+            alpha_tilde[ff,n,...] = Ba[ii-n,...] + Ba[ii+n,...]
+            beta_tilde[ff,n,...] = Aa[ii-n,...]-Aa[ii+n,...]  
     
     return alpha_hat, beta_hat, alpha_tilde, beta_tilde
 
