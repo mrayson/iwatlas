@@ -63,7 +63,7 @@ def harmonic_to_seasonal(Aa, Ba, na, ntide):
     assert Aa.shape[0] == (ntide)*(2*na+1)
     assert Ba.shape[0] == (ntide)*(2*na+1)
 
-    if Aa.ndim = 1:
+    if Aa.ndim == 1:
         nc = 0
     else:
         nc = Aa.shape[-1]
