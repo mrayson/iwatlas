@@ -26,7 +26,7 @@ $$
 import numpy as np
 import pandas as pd
 
-from soda.utils.harmonic_analysis import harmonic_fit_array
+from sfoda.utils.harmonic_analysis import harmonic_fit_array
 
 
 ## Functions (to go into iwatlas module)

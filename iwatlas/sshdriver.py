@@ -7,8 +7,8 @@ Driver routines to output SSH predictions at arbitrary space-time points
 import numpy as np
 from datetime import datetime
 
-from soda.dataio.suntans.sunxray import Sunxray
-from soda.utils.myproj import MyProj
+from sfoda.suntans.sunxray import Sunxray
+from sfoda.utils.myproj import MyProj
 
 from . import harmonics
 from .filter2d import dff2d
