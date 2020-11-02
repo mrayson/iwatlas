@@ -150,4 +150,45 @@ def extract_amp_nonstat_dff(ssh, xlims, ylims, dx, time,\
     
     return A_re_f, A_im_f, A_re, A_im, X, Y
 
+####
+# Grid helper functions
+def calc_scoord_log(Nz, rfac):
+    """
+    Return an s-coordinate vector with logarithmic stretching
+    """
+    s0 = (rfac-1)/(np.power(rfac, Nz-1)-1)
+    scoord = np.zeros((Nz,))
+    scoord[1] = s0
+    for ii in range(2,Nz):
+        scoord[ii] =  scoord[ii-1]*rfac
+
+    return np.cumsum(scoord)
+
+def return_zcoord_3d(sun, xpt, ypt, nt, nz, scoord=None, rfac=1.04):
+    """
+    Create a vertical grid array
+    
+    Inputs:
+    ---
+        N2file: filename of the stratification climatology dataset (NWS_2km_GLORYS_hex_2013_2014_Stratification_Atlas.nc)
+        xpt,ypt: vectors [nx] of output space points
+        nt: scalar, number of time points
+        nz: scalar, number of vertical layers
+        scoord: (optional) vector nx, locations of vertical nodes in non-dimensional space i.e. between 0 and 1
+        rfac: (optional) scalar 1 to 1.1 logarithmic scaling factor for the vertical coordinate
+    
+    Returns:
+        zout: array of buoyancy frequency [nz, nx, nt]
+    """
+    # Get the depths
+    h = sun.interpolate(sun._ds.dv, xpt, ypt)
+
+    hgrd = h[:,None] * np.ones((nt,))[None,:]
+    
+    if scoord is None:
+        scoord = calc_scoord_log(nz, rfac)
+
+    return scoord[:,None,None] * hgrd[None, ...]
+
+
 

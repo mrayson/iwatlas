@@ -49,8 +49,7 @@ def harmonic_pred_N2(aa, Aa, Ba, omega, tdays):
     
     return amp
 
-
-def predict_N2(N2file, xpt, ypt, timept, zout):
+def predict_N2(N2file, xpt, ypt, timept, nz, **kwargs):
     """
     Return a buoyancy frequency squared (N^2) vertical profile at a space-time location of choice
     
@@ -59,21 +58,45 @@ def predict_N2(N2file, xpt, ypt, timept, zout):
         N2file: filename of the stratification climatology dataset (NWS_2km_GLORYS_hex_2013_2014_Stratification_Atlas.nc)
         xpy,ypt: vectors [nx] of output space points
         timept: vector [nt] of datetime64 time objects
-        zout: vector [nz] of output vertical locations (should be positive)
+        nz: scalar with number of sigma layers
     
     Returns:
         N2_z: array of buoyancy frequency [nz, nx, nt]
     
     """
     
+    # Get the depth first
     ds_N2 = sshdriver.load_ssh_clim(N2file)
+
+    zout = sshdriver.return_zcoord_3d(ds_N2, xpt, ypt, timept.shape[0], nz, **kwargs)
+    zout[0,...] = 1e-6 # Avoid zeros in the first layer
+    
+    N2_t = _predict_N2_params(ds_N2, xpt, ypt, timept)
+    
+    # Reconstruct in the vertical direction
+    zpr = -np.log(zout)
+
+    return double_gaussian_N2(zpr, N2_t), zout
+    
+def _predict_N2_params(ds_N2, xpt, ypt, timept):
+    """
+    Return buoyancy frequency squared (N^2) empirical parameters at a space-time location of choice
+    
+    Inputs:
+    ---
+        N2file: filename of the stratification climatology dataset (NWS_2km_GLORYS_hex_2013_2014_Stratification_Atlas.nc)
+        xpy,ypt: vectors [nx] of output space points
+        timept: vector [nt] of datetime64 time objects
+    
+    Returns:
+        N2_t: array of buoyancy frequency [nparams, nx, nt]
+    
+    """
     
     # Check inputs
-    zout = np.abs(zout)
     tsec = (timept - BASETIME).astype('timedelta64[s]').astype(float)
 
     assert xpt.shape == ypt.shape
-    assert zout.ndim == 1
     assert xpt.ndim == 1
     assert timept.ndim == 1
 
@@ -97,10 +120,9 @@ def predict_N2(N2file, xpt, ypt, timept, zout):
     # Step 2: reconstruct the time-series
     N2_t = harmonic_pred_N2(N2_mu, N2_re, N2_im, omega, tsec)
     
-    # Step 4: reconstruct in the vertical direction
-    zpr = -np.log(zout)
+    return N2_t
 
-    return double_gaussian_N2(zpr[:,None,None], N2_t)
+   
 
 ######
 # Fitting routines

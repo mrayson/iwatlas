@@ -20,13 +20,13 @@ timept = np.array([np.datetime64('2013-07-01 00:00:00'),
                    np.datetime64('2013-11-01 00:00:00'),
                    np.datetime64('2014-03-01 00:00:00')])
 
-zout = np.arange(5,1005,10.)
-
+# zout = np.arange(5,1005,10.)
+Nz = 80
 ###########
 
 print('Calculating densty stratification data...')
 
-N2_z = strat.predict_N2(N2file, xpt, ypt, timept ,zout)
+N2_z, zout = strat.predict_N2(N2file, xpt, ypt, timept , Nz)
 
 plt.figure()
 plt.plot(N2_z[:,0,0], -zout)

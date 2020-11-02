@@ -3,8 +3,11 @@ Test the density stratification loading routines
 """
 
 import numpy as np 
-import iwatlas.stratification as strat
 import matplotlib.pyplot as plt
+
+
+import iwatlas.stratification as strat
+from iwatlas import iwaves
 
 ############
 basedir = '/home/suntans/cloudstor/Data/IWAtlas-lite'
@@ -29,9 +32,15 @@ print('Calculating densty stratification data...')
 
 N2_z = strat.predict_N2(N2file, xpt, ypt, timept ,zout)
 
+phi, c = iwaves.iwave_modes_uneven(N2_z[:,0,0], zout)
+
 plt.figure()
-plt.plot(N2_z[:,0,0], -zout)
-plt.plot(N2_z[:,0,1], -zout)
-plt.plot(N2_z[:,0,2], -zout)
-plt.legend(timept)
+plt.plot(phi[:,0], -zout)
 plt.show()
+
+#plt.figure()
+#plt.plot(N2_z[:,0,0], -zout)
+#plt.plot(N2_z[:,0,1], -zout)
+#plt.plot(N2_z[:,0,2], -zout)
+#plt.legend(timept)
+#plt.show()
