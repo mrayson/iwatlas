@@ -28,7 +28,7 @@ def load_ssh_clim(sshfile):
     return sun
 
 
-def extract_hc_ssh(sshfile, x,y, sun=None, kind='nearest'):
+def extract_hc_ssh(sshfile, x,y, sun=None, kind='linear'):
     """
     Extract harmonic consituents from the internal tide SSH atlas
     """
@@ -55,12 +55,12 @@ def extract_hc_ssh(sshfile, x,y, sun=None, kind='nearest'):
         
     return aa, Aa, Ba, sun._ds.omega.values
 
-def predict_ssh(sshfile, x, y, time, kind='nearest'):
+def predict_ssh(sshfile, x, y, time, kind='linear'):
     """
     Perform harmonic predictions at the points in x and y
     """
     
-    aa, Aa, Ba, frq = extract_hc_ssh(sshfile, x,y,kind='nearest')
+    aa, Aa, Ba, frq = extract_hc_ssh(sshfile, x,y,kind=kind)
     
     # Get the time in seconds
     tsec = (time - np.datetime64('1990-01-01 00:00:00')).astype('timedelta64[s]').astype(float)
@@ -135,6 +135,10 @@ def extract_amp_nonstat_dff(ssh, xlims, ylims, dx, time,\
         A_im = A_im.reshape((ntide, ntime, My, Mx))
     
     ntide, ntime, My, Mx = A_re.shape
+    
+    # Zero out any nan's
+    A_re[np.isnan(A_re)] = 0
+    A_im[np.isnan(A_im)] = 0
     
     # Prepare the output array
     A_re_f = np.zeros_like(A_re)
