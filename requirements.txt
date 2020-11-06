@@ -1,0 +1,3 @@
+git+git://github.com/mrayson/sfoda@releases/tag/v0.0.2#egg=sfoda
+git+git://github.com/mrayson/iwaves@releases/tag/v0.4.0#egg=iwaves
+
