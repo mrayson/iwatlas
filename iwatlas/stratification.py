@@ -11,8 +11,14 @@ from scipy.optimize import least_squares
 
 from iwatlas import sshdriver
 
+from soda.utils.harmonic_analysis import harmonic_fit_array
+
+twopi = 2*np.pi
+tdaysec = 86400.
+
+
 # Global variable
-BASETIME = np.datetime64('2000-01-01 00:00:00')
+BASETIME = np.datetime64('1990-01-01 00:00:00')
 
 #####
 # Parametric profiles
@@ -20,6 +26,12 @@ BASETIME = np.datetime64('2000-01-01 00:00:00')
 def double_gaussian_N2(z, beta):
     return beta[0,...] + beta[1,...] * (np.exp(- ((z+beta[2,...])/beta[3,...])**2 )  +\
               np.exp(-((z+beta[4,...])/beta[5,...])**2 ) )
+
+def double_gaussian_N2_v2(z, beta):
+    w1 = beta[6]
+    w2 = 1-w1
+    return beta[0,...] + beta[1,...] * (w1*np.exp(- ((z+beta[2,...])/beta[3,...])**2 )  +\
+              w2*np.exp(-((z+beta[4,...])/beta[5,...])**2 ) )
 
 def sech(z):
     return 1. / np.cosh(z)
@@ -160,7 +172,8 @@ def fit_rho_lsq(rho, z, density_func, bounds, initguess):
         bounds=bounds,\
         xtol=1e-10,
         ftol=1e-10,
-        loss='cauchy', f_scale=0.1, # Robust
+        loss='cauchy', 
+        f_scale=0.1, # Robust
         verbose=0,
         )
     f0 = soln['x']
@@ -172,4 +185,12 @@ def fit_rho_lsq(rho, z, density_func, bounds, initguess):
     return rhofit, f0, err
 
 
+def seasonal_harmonic_fit(X, t, na, omega_A=twopi/(365*tdaysec)):
+    frq_all =[n*omega_A for n in range(1,na+1)]
 
+    Y = harmonic_fit_array(X, t, frq_all, axis=0)
+    aa = Y[0]
+    Aa = Y[1::2]
+    Ba = Y[2::2]
+    
+    return aa, Aa, Ba, frq_all

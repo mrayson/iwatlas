@@ -1,11 +1,13 @@
 """
 Driver routines to output SSH predictions at arbitrary space-time points
 
- Requires SODA (github.com/mrayson/soda.git)
+ Requires SFODA (github.com/mrayson/sfoda.git)
 """
 
 import numpy as np
 from datetime import datetime
+from scipy.interpolate import RectBivariateSpline
+
 
 from sfoda.suntans.sunxray import Sunxray
 from sfoda.utils.myproj import MyProj
@@ -101,11 +103,113 @@ def extract_amp_nonstat(sshobj, xpt, ypt, time, kind='linear'):
     A_re, A_im = harmonics.seasonal_amp(alpha_hat, beta_hat, alpha_tilde, beta_tilde, tsec )
     
     return A_re, A_im
+
+def extract_amp_dff(ssh, xlims, ylims, dx, 
+                    thetalow, thetahigh, A_re=None, A_im=None):
+    """
+    Extract the non-stationary amplitude harmonic paramters 
+    for a region and perform a directional Fourier filter (DFF).
+    
+    Use this function to extract directional amplitudes of ALL harmonics
+    in a dataset.
+    
+    Inputs:
+    ------
+        ssh: sunxray object
+        xlims, ylims: tuples with lower and upper x/y limites
+        dx: output grid spacing (interpolate onto this spacing)
+        time: output time step
+        thetalow: low angle for filter (degrees CCW from E)
+        thetahigh: high angle for filter (degrees CCW from E)
+        
+    Outputs:
+    -----
+        A_re_f, A_im_f: 2D filtered complex array
+    """
+
+    # Interpolate the amplitude onto a grid prior to DFF
+    xgrd  = np.arange(xlims[0], xlims[1]+dx, dx)
+    ygrd  = np.arange(ylims[0], ylims[1]+dx, dx)
+    X,Y = np.meshgrid(xgrd, ygrd)
+    My, Mx = X.shape
+    
+    aa, A_re, A_im, omega = extract_hc_ssh(None, X, Y, sun=ssh, kind='linear')
+    
+    ntide, My, Mx = A_re.shape
+    
+    # Zero out any nan's
+    A_re[np.isnan(A_re)] = 0
+    A_im[np.isnan(A_im)] = 0
+    
+    # Prepare the output array
+    A_re_f = np.zeros_like(A_re)
+    A_im_f = np.zeros_like(A_im)
+    
+    # Loop through and perform the DFF on each 2D slice
+    for nn in range(ntide):
+        z_f = dff2d(A_re[nn,...] + 1j*A_im[nn,...], dx, thetalow, thetahigh)
+        A_re_f[nn,...] = z_f.real
+        A_im_f[nn,...] = z_f.imag
+            
+    
+    return A_re_f, A_im_f, A_re, A_im, X, Y, omega
+
+def extract_ssh_point_dff(ssh_ds, x0, y0, timeout, thetalow, thetahigh, 
+                    xyrange=2.0, dx=2.0 ):
+    """
+    Extract the a time-series of SSH at a point that is propagating in a given direction
+    
+    Inputs:
+    ------
+        ssh: sunxray object
+        x0, y0: scalar lon/lat output point
+        timeout: output time step
+        thetalow: low angle for filter (degrees CCW from E)
+        thetahigh: high angle for filter (degrees CCW from E)
+        xyrange: (optional) range for box that surrounds the point to perform DFF (default = 2.0 i.e. box is 4x4 degrees)
+        dx: (optional, default=0.02 degress) output grid spacing (interpolate onto this spacing)
+
+        
+    Outputs:
+    -----
+        ssh_pt: time-series of SSH at the point
+    """
+    xlims = (x0-xyrange, x0+xyrange)
+    ylims = (y0-xyrange, y0+xyrange)
+
+
+    # Convert the time
+    reftime = np.datetime64(ssh_ds._ds.attrs['ReferenceDate'])
+    tsec = (timeout - reftime).astype('timedelta64[s]').astype(float)
+
+    # Extract the amplitude for a region and do the DFF
+    A_re_f, A_im_f, A_re, A_im, X, Y, omega = extract_amp_dff(ssh_ds, xlims, ylims, dx, \
+                        thetalow, thetahigh, A_re=None, A_im=None)
+
+    # Interpolate the DFF result back onto the point of interest
+    nf, ny, nx = A_re_f.shape
+
+    A_re_pt = np.zeros((nf,))
+    A_im_pt = np.zeros((nf,))
+    for ff in range(nf):
+        F = RectBivariateSpline( Y[:,0], X[0,:], A_re_f[ff,...])
+        A_re_pt[ff] = F(y0,x0)
+        F = RectBivariateSpline( Y[:,0], X[0,:], A_im_f[ff,...])
+        A_im_pt[ff] = F(y0,x0)
+
+    # Generate a time-series
+    ssh_pt_f = harmonics.harmonic_pred(0, A_re_pt, A_im_pt, omega, tsec)
+    
+    return ssh_pt_f
+
 def extract_amp_nonstat_dff(ssh, xlims, ylims, dx, time,\
                     thetalow, thetahigh, A_re=None, A_im=None):
     """
     Extract the non-stationary amplitude over a region and perform a
-    direction Fourier filter (DFF)
+    direction Fourier filter (DFF).
+    
+    Use this function to extract a spatial snapshot of the amplitude
+    of a fundamental tidal frequency (e.g. M2) for a given time snapshot.
     
     Inputs:
     ------
