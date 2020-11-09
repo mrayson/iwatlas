@@ -119,8 +119,8 @@ def _predict_N2_params(ds_N2, xpt, ypt, timept):
 
     
     # Step 1: Interpolate the N2 beta parameters in space
-    omega = ds_N2._ds.omega.values
-    na = ds_N2._ds.dims['Ntide']
+    omega = ds_N2._ds['omegaA'].values
+    na = ds_N2._ds.dims['Nannual']
     nparams = ds_N2._ds.dims['Nparams']
 
     nx = xpt.shape
