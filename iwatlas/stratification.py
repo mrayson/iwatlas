@@ -11,7 +11,7 @@ from scipy.optimize import least_squares
 
 from iwatlas import sshdriver
 
-from soda.utils.harmonic_analysis import harmonic_fit_array
+from sfoda.utils.harmonic_analysis import harmonic_fit_array
 
 twopi = 2*np.pi
 tdaysec = 86400.
