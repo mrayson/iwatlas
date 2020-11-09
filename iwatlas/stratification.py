@@ -61,7 +61,7 @@ def harmonic_pred_N2(aa, Aa, Ba, omega, tdays):
     
     return amp
 
-def predict_N2(N2file, xpt, ypt, timept, nz, **kwargs):
+def predict_N2(N2file, xpt, ypt, timept, nz, density_func=None, **kwargs):
     """
     Return a buoyancy frequency squared (N^2) vertical profile at a space-time location of choice
     
@@ -79,16 +79,21 @@ def predict_N2(N2file, xpt, ypt, timept, nz, **kwargs):
     
     # Get the depth first
     ds_N2 = sshdriver.load_ssh_clim(N2file)
-
+    
+    # Load the density function from the global attributes
+    if density_func is None:
+        #density_func = getattr(., ds_N2._ds.attrs['density_func'] )
+        density_func = globals()[ds_N2._ds.attrs['density_func']]
+        
     zout = sshdriver.return_zcoord_3d(ds_N2, xpt, ypt, timept.shape[0], nz, **kwargs)
-    zout[0,...] = 1e-6 # Avoid zeros in the first layer
+    #zout[0,...] = 1e-6 # Avoid zeros in the first layer
     
     N2_t = _predict_N2_params(ds_N2, xpt, ypt, timept)
     
     # Reconstruct in the vertical direction
     zpr = -np.log(zout)
 
-    return double_gaussian_N2(zpr, N2_t), zout
+    return density_func(zpr, N2_t), zout
     
 def _predict_N2_params(ds_N2, xpt, ypt, timept):
     """
