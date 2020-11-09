@@ -1,4 +1,3 @@
-cython
-git+git://github.com/mrayson/sfoda@v0.0.2#egg=sfoda
+git+git://github.com/mrayson/sfoda@v0.0.3#egg=sfoda
 git+git://github.com/mrayson/iwaves@v0.4.0#egg=iwaves
 
