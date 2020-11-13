@@ -21,11 +21,17 @@ TBC.
 
 # Tutorials 
 
-An interactive example is available on binder:
+An interactive tutorial is available to play with on binder:
+
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/mrayson/iwatlas/master?filepath=sandpit%2Ftutorial_iwatlas_basics.ipynb)
+
+A more thorough overview of the tools is available in this notebook:
 
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/mrayson/iwatlas/master?filepath=sandpit%2Ftest_all_iwatlas_routines.ipynb)
 
-There are a number of less-polished example notebooks in the [sandpit](./sandpit/).
+(Note that the binder computing instance will likely run out of memory for this example...)
+
+There are a number of less-polished example/testing notebooks in the [sandpit](./sandpit/).
 
 ## Downloads
 

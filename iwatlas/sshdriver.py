@@ -18,24 +18,35 @@ from .filter2d import dff2d
 def load_ssh_clim(sshfile):
     """
     Load the climatological atlas as a SUNTANS xarray data object
-    """
-    sun = Sunxray(sshfile,)
-
-    # Reproject into lat/lon
-    P = MyProj('merc')
-    sun.xp,sun.yp = P.to_ll(sun.xp, sun.yp)
-    sun.xv,sun.yv = P.to_ll(sun.xv, sun.yv)
-    sun._xy = None
     
-    return sun
+    Input:
+    ---
+        sshfile: atlas netcdf file string OR Sunxray object
+    """
+    if isinstance(sshfile, Sunxray):
+        return sshfile
+    
+    elif isinstance(sshfile, str):
+        sun = Sunxray(sshfile,)
+
+        # Reproject into lat/lon
+        P = MyProj('merc')
+        sun.xp,sun.yp = P.to_ll(sun.xp, sun.yp)
+        sun.xv,sun.yv = P.to_ll(sun.xv, sun.yv)
+        sun._xy = None
+
+        return sun
+    else:
+        raise Exception('Unknown type {}'.format(type(sshfile)))
 
 
 def extract_hc_ssh(sshfile, x,y, sun=None, kind='linear'):
     """
     Extract harmonic consituents from the internal tide SSH atlas
     """
-    if sun is None:
-        sun = load_ssh_clim(sshfile)
+    #if sun is None:
+    # This function can accept a Sunxray object
+    sun = load_ssh_clim(sshfile)
     
     ntide = sun._ds.Ntide.shape[0]
 
@@ -84,15 +95,17 @@ def predict_ssh(sshfile, x, y, time, kind='linear'):
     # Do the actual prediction
     return  harmonics.harmonic_pred(aa, Aa, Ba, frq, tsec)
 
-def extract_amp_nonstat(sshobj, xpt, ypt, time, kind='linear'):
+def extract_amp_nonstat(sshfile, xpt, ypt, time, kind='linear'):
     """
     Extract time-varying (nonstationary) amplitude time-series for each tidal frequency
     """
+    sshobj = load_ssh_clim(sshfile)
+
 
     basetime = np.datetime64(sshobj._ds.attrs['ReferenceDate'])
     tsec = (time - basetime).astype('timedelta64[s]').astype(float)
     
-    aa, Aa, Ba, omega = extract_hc_ssh(None, xpt, ypt, kind=kind, sun=sshobj)
+    aa, Aa, Ba, omega = extract_hc_ssh(sshobj, xpt, ypt, kind=kind)
     
     na = sshobj._ds.attrs['Number_Annual_Harmonics']
     ntide = sshobj._ds.dims['Ntide']//(2*na+1)
@@ -104,7 +117,7 @@ def extract_amp_nonstat(sshobj, xpt, ypt, time, kind='linear'):
     
     return A_re, A_im
 
-def extract_amp_dff(ssh, xlims, ylims, dx, 
+def extract_amp_dff(sshfile, xlims, ylims, dx, 
                     thetalow, thetahigh, A_re=None, A_im=None):
     """
     Extract the non-stationary amplitude harmonic paramters 
@@ -115,7 +128,7 @@ def extract_amp_dff(ssh, xlims, ylims, dx,
     
     Inputs:
     ------
-        ssh: sunxray object
+        ssh: sunxray object OR file string
         xlims, ylims: tuples with lower and upper x/y limites
         dx: output grid spacing (interpolate onto this spacing)
         time: output time step
@@ -133,7 +146,7 @@ def extract_amp_dff(ssh, xlims, ylims, dx,
     X,Y = np.meshgrid(xgrd, ygrd)
     My, Mx = X.shape
     
-    aa, A_re, A_im, omega = extract_hc_ssh(None, X, Y, sun=ssh, kind='linear')
+    aa, A_re, A_im, omega = extract_hc_ssh(sshfile, X, Y, kind='linear')
     
     ntide, My, Mx = A_re.shape
     
@@ -154,14 +167,14 @@ def extract_amp_dff(ssh, xlims, ylims, dx,
     
     return A_re_f, A_im_f, A_re, A_im, X, Y, omega
 
-def extract_ssh_point_dff(ssh_ds, x0, y0, timeout, thetalow, thetahigh, 
+def extract_ssh_point_dff(sshfile, x0, y0, timeout, thetalow, thetahigh, 
                     xyrange=2.0, dx=2.0 ):
     """
     Extract the a time-series of SSH at a point that is propagating in a given direction
     
     Inputs:
     ------
-        ssh: sunxray object
+        sshfile: sunxray object OR file string
         x0, y0: scalar lon/lat output point
         timeout: output time step
         thetalow: low angle for filter (degrees CCW from E)
@@ -174,16 +187,18 @@ def extract_ssh_point_dff(ssh_ds, x0, y0, timeout, thetalow, thetahigh,
     -----
         ssh_pt: time-series of SSH at the point
     """
+    sshobj = load_ssh_clim(sshfile)
+    
     xlims = (x0-xyrange, x0+xyrange)
     ylims = (y0-xyrange, y0+xyrange)
 
 
     # Convert the time
-    reftime = np.datetime64(ssh_ds._ds.attrs['ReferenceDate'])
+    reftime = np.datetime64(sshobj._ds.attrs['ReferenceDate'])
     tsec = (timeout - reftime).astype('timedelta64[s]').astype(float)
 
     # Extract the amplitude for a region and do the DFF
-    A_re_f, A_im_f, A_re, A_im, X, Y, omega = extract_amp_dff(ssh_ds, xlims, ylims, dx, \
+    A_re_f, A_im_f, A_re, A_im, X, Y, omega = extract_amp_dff(sshobj, xlims, ylims, dx, \
                         thetalow, thetahigh, A_re=None, A_im=None)
 
     # Interpolate the DFF result back onto the point of interest
@@ -202,7 +217,7 @@ def extract_ssh_point_dff(ssh_ds, x0, y0, timeout, thetalow, thetahigh,
     
     return ssh_pt_f
 
-def extract_amp_nonstat_dff(ssh, xlims, ylims, dx, time,\
+def extract_amp_nonstat_dff(sshfile, xlims, ylims, dx, time,\
                     thetalow, thetahigh, A_re=None, A_im=None):
     """
     Extract the non-stationary amplitude over a region and perform a
@@ -224,6 +239,7 @@ def extract_amp_nonstat_dff(ssh, xlims, ylims, dx, time,\
     -----
         A_re_f, A_im_f: 2D filtered complex array
     """
+    ssh = load_ssh_clim(sshfile)
 
     # Interpolate the amplitude onto a grid prior to DFF
     xgrd  = np.arange(xlims[0], xlims[1]+dx, dx)
@@ -272,13 +288,13 @@ def calc_scoord_log(Nz, rfac):
 
     return np.cumsum(scoord)
 
-def return_zcoord_3d(sun, xpt, ypt, nt, nz, scoord=None, rfac=1.04):
+def return_zcoord_3d(sshfile, xpt, ypt, nt, nz, scoord=None, rfac=1.04):
     """
     Create a vertical grid array
     
     Inputs:
     ---
-        N2file: filename of the stratification climatology dataset (NWS_2km_GLORYS_hex_2013_2014_Stratification_Atlas.nc)
+        sshfile: Sunxray object or filename of the stratification climatology dataset (NWS_2km_GLORYS_hex_2013_2014_Stratification_Atlas.nc)
         xpt,ypt: vectors [nx] of output space points
         nt: scalar, number of time points
         nz: scalar, number of vertical layers
@@ -288,8 +304,10 @@ def return_zcoord_3d(sun, xpt, ypt, nt, nz, scoord=None, rfac=1.04):
     Returns:
         zout: array of buoyancy frequency [nz, nx, nt]
     """
+    ssh = load_ssh_clim(sshfile)
+
     # Get the depths
-    h = sun.interpolate(sun._ds.dv, xpt, ypt)
+    h = ssh.interpolate(ssh._ds.dv, xpt, ypt)
 
     hgrd = h[:,None] * np.ones((nt,))[None,:]
     
