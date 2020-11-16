@@ -28,6 +28,9 @@ def load_ssh_clim(sshfile):
     
     elif isinstance(sshfile, str):
         sun = Sunxray(sshfile,)
+        
+        # Calculate the grid properties
+        sun.calc_all_properties()
 
         # Reproject into lat/lon
         P = MyProj('merc')
@@ -75,25 +78,8 @@ def predict_ssh(sshfile, x, y, time, kind='linear'):
     
     aa, Aa, Ba, frq = extract_hc_ssh(sshfile, x,y,kind=kind)
     
-    # Get the time in seconds
-    tsec = (time - np.datetime64('1990-01-01 00:00:00')).astype('timedelta64[s]').astype(float)
+    return predict_scalar(time, aa, Aa, Ba, frq)
     
-    # Need to reshape the time vector for matrix multiplications
-    if isinstance(aa,float):
-        tsec = tsec
-    elif isinstance(aa, np.ndarray):
-        ndim = aa.ndim
-        if ndim == 1:
-            tsec = tsec
-        elif ndim == 2:
-            tsec = tsec[:,None]
-        elif ndim == 3:
-            tsec = tsec[:,None, None]
-        else:
-            raise Exception('unsupported number of dimension in x matrix')
-    
-    # Do the actual prediction
-    return  harmonics.harmonic_pred(aa, Aa, Ba, frq, tsec)
 
 def extract_amp_nonstat(sshfile, xpt, ypt, time, kind='linear'):
     """
@@ -316,5 +302,57 @@ def return_zcoord_3d(sshfile, xpt, ypt, nt, nz, scoord=None, rfac=1.04):
 
     return scoord[:,None,None] * hgrd[None, ...]
 
+###
+# Generic routines
+def extract_amp_xy(sshfile, x, y, aain, Aain, Bain, kind='linear'):
+    """
+    Extract harmonic consituents from the internal tide SSH atlas
+    """
+    #if sun is None:
+    # This function can accept a Sunxray object
+    sun = load_ssh_clim(sshfile)
+    
+    ntide = sun._ds.Ntide.shape[0]
 
+    if isinstance(x, float):
+        aa = np.zeros((1,))
+        Aa = np.zeros((ntide,)) 
+        Ba = np.zeros((ntide,)) 
+    
+    elif isinstance(x, np.ndarray):
+        sz = x.shape
+        aa = np.zeros((1,)+sz)
+        Aa = np.zeros((ntide,)+sz) 
+        Ba = np.zeros((ntide,)+sz)
+        
+    aa[0] = sun.interpolate(aain, x, y, kind=kind)
+    for ii in range(ntide):
+        Aa[ii,...] = sun.interpolate(Aain[ii,:], x,y, kind=kind)
+        Ba[ii,...] = sun.interpolate(Bain[ii,:], x,y, kind=kind)
+        
+    return aa, Aa, Ba, sun._ds.omega.values
 
+def predict_scalar(time, aa, Aa, Ba, frq):
+    """
+    Perform harmonic predictions at the points in x and y
+    """
+    
+    # Get the time in seconds
+    tsec = (time - np.datetime64('1990-01-01 00:00:00')).astype('timedelta64[s]').astype(float)
+    
+    # Need to reshape the time vector for matrix multiplications
+    if isinstance(aa,float):
+        tsec = tsec
+    elif isinstance(aa, np.ndarray):
+        ndim = aa.ndim
+        if ndim == 1:
+            tsec = tsec
+        elif ndim == 2:
+            tsec = tsec[:,None]
+        elif ndim == 3:
+            tsec = tsec[:,None, None]
+        else:
+            raise Exception('unsupported number of dimension in x matrix')
+    
+    # Do the actual prediction
+    return  harmonics.harmonic_pred(aa, Aa, Ba, frq, tsec)
