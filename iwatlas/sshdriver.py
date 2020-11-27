@@ -103,6 +103,28 @@ def extract_amp_nonstat(sshfile, xpt, ypt, time, kind='linear'):
     
     return A_re, A_im
 
+def extract_nonstat(sshfile, Aa, Ba, time, kind='linear'):
+    """
+    Extract time-varying (nonstationary) amplitude time-series for each tidal frequency
+    """
+    sshobj = load_ssh_clim(sshfile)
+
+    basetime = np.datetime64(sshobj._ds.attrs['ReferenceDate'])
+    tsec = (time - basetime).astype('timedelta64[s]').astype(float)
+    
+    #aa, Aa, Ba, omega = extract_hc_ssh(sshobj, xpt, ypt, kind=kind)
+    
+    na = sshobj._ds.attrs['Number_Annual_Harmonics']
+    ntide = sshobj._ds.dims['Ntide']//(2*na+1)
+
+    alpha_hat, beta_hat, alpha_tilde, beta_tilde =\
+        harmonics.harmonic_to_seasonal(Aa, Ba, na, ntide)
+
+    A_re, A_im = harmonics.seasonal_amp(alpha_hat, beta_hat, alpha_tilde, beta_tilde, tsec )
+    
+    return A_re, A_im
+
+
 def extract_amp_dff(sshfile, xlims, ylims, dx, 
                     thetalow, thetahigh, A_re=None, A_im=None):
     """
@@ -356,3 +378,25 @@ def predict_scalar(time, aa, Aa, Ba, frq):
     
     # Do the actual prediction
     return  harmonics.harmonic_pred(aa, Aa, Ba, frq, tsec)
+
+def extract_dff(A_re, A_im, X, Y, dx, thetalow, thetahigh):
+    """
+    General function to calculate DFF of a scalar
+    """
+    ntide, My, Mx = A_re.shape
+    
+    # Zero out any nan's
+    A_re[np.isnan(A_re)] = 0
+    A_im[np.isnan(A_im)] = 0
+    
+    # Prepare the output array
+    A_re_f = np.zeros_like(A_re)
+    A_im_f = np.zeros_like(A_im)
+    
+    # Loop through and perform the DFF on each 2D slice
+    for nn in range(ntide):
+        z_f = dff2d(A_re[nn,...] + 1j*A_im[nn,...], dx, thetalow, thetahigh)
+        A_re_f[nn,...] = z_f.real
+        A_im_f[nn,...] = z_f.imag
+            
+    return A_re_f, A_im_f

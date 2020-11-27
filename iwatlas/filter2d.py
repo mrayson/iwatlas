@@ -44,7 +44,14 @@ def dff2d(z, dx, thetalow, thetahigh):
 
     # Create the filter matrix
     H = np.zeros_like(thetadeg)
-    filter_idx = (thetadeg > thetalow) & (thetadeg < thetahigh)
+    
+    if thetahigh > 360:
+        filter_idx1 = (thetadeg > thetalow) & (thetadeg < 360)
+        filter_idx2 = (thetadeg > 0) & (thetadeg < np.mod(thetahigh,360))
+        filter_idx = filter_idx1 | filter_idx2
+    else:
+        filter_idx = (thetadeg > thetalow) & (thetadeg < thetahigh)
+        
     H[filter_idx] = 1
 
     # Now reorder H into the original FFT ordering

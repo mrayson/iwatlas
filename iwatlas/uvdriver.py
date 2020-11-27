@@ -10,6 +10,8 @@ from . import sshdriver
 from . import stratification as strat
 from . import iwaves
 
+from sfoda.utils.barycentric import BarycentricInterp
+
 def calc_coriolis(latdeg):
     omega = 2*np.pi/86400.
     degrad = np.pi/180.
@@ -103,3 +105,91 @@ def predict_uv_z(sshfile, x, y, time, nz=80, mode=0, kind='linear'):
     vz = dphi_dz_norm * vt.T 
     
     return uz, vz, zout
+
+def extract_uv_dff(sshfile, xlims, ylims, dx, 
+                    thetalow, thetahigh):
+    """
+    Extract the non-stationary velocity amplitude harmonic paramters 
+    for a region and perform a directional Fourier filter (DFF).
+    
+    Use this function to extract directional amplitudes of ALL harmonics
+    in a dataset.
+    
+    Inputs:
+    ------
+        ssh: sunxray object OR file string
+        xlims, ylims: tuples with lower and upper x/y limites
+        dx: output grid spacing (interpolate onto this spacing)
+        time: output time step
+        thetalow: low angle for filter (degrees CCW from E)
+        thetahigh: high angle for filter (degrees CCW from E)
+        
+    Outputs:
+    -----
+        A_re_f, A_im_f: 2D filtered complex array
+    """
+    ssh = sshdriver.load_ssh_clim(sshfile)
+
+    # Interpolate the amplitude onto a grid prior to DFF
+    xgrd  = np.arange(xlims[0], xlims[1]+dx, dx)
+    ygrd  = np.arange(ylims[0], ylims[1]+dx, dx)
+    X,Y = np.meshgrid(xgrd, ygrd)
+    My, Mx = X.shape
+    
+    u, v, omega = extract_hc_uv_spatial(ssh)
+    ntide, Nc = u.shape
+    
+    # Interpolate
+    aain = np.zeros((Nc,))
+    _, u_re, u_im, _ = sshdriver.extract_amp_xy(ssh, X, Y, aain, np.real(u), np.imag(u), kind='linear')
+    _, v_re, v_im, _ = sshdriver.extract_amp_xy(ssh, X, Y, aain, np.real(v), np.imag(v), kind='linear')
+    
+    u_re_f, u_im_f = sshdriver.extract_dff(u_re, u_im, X, Y, dx, thetalow, thetahigh)
+    v_re_f, v_im_f = sshdriver.extract_dff(v_re, v_im, X, Y, dx, thetalow, thetahigh)
+
+    return u_re_f, u_im_f, v_re_f, v_im_f, X, Y, omega
+
+def extract_uv_dff_bc(sshfile, xline, yline, thetalow, thetahigh, dx=0.02, xyrange=1.5):
+    """
+    Extract the velocity amplitude at points along a line. Performs a DFF
+    so that velocity is within the arc of propagation.
+    
+    Use this function to extract boundary conditions for a numerical model, for example.
+    
+    Inputs:
+    ------
+        ssh: sunxray object OR file string
+        xline, yline: vectors of output points
+        thetalow: low angle for filter (degrees CCW from E)
+        thetahigh: high angle for filter (degrees CCW from E)
+        
+    Outputs:
+    -----
+        U_re, U_im, V_re, U_im: 2D filtered complex array
+        omega: frequencies
+    """
+    
+    ssh = sshdriver.load_ssh_clim(sshfile)
+    
+    xlims = (xline.min()-xyrange, xline.max()+xyrange)
+    ylims = (yline.min()-xyrange, yline.max()+xyrange)
+
+    u_re_f, u_im_f, v_re_f, v_im_f, X, Y, omega = extract_uv_dff(ssh, xlims, ylims, dx, thetalow, thetahigh)
+    
+    # Interpolate the results onto the line
+    Fi = BarycentricInterp(np.array([X.ravel(), Y.ravel()]).T, np.array([xline,yline]).T )
+
+    ntide, ny, nx = u_re_f.shape
+    nline = xline.shape[0]
+    U_re = np.zeros((ntide, nline))
+    U_im = np.zeros((ntide, nline))
+    V_re = np.zeros((ntide, nline))
+    V_im = np.zeros((ntide, nline))
+
+    for ii in range(ntide):
+        U_re[ii,...] = Fi(u_re_f[ii,...].ravel())
+        U_im[ii,...] = Fi(u_im_f[ii,...].ravel())
+        V_re[ii,...] = Fi(v_re_f[ii,...].ravel())
+        V_im[ii,...] = Fi(u_im_f[ii,...].ravel())
+        
+    return U_re, U_im, V_re, V_im, omega
