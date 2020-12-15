@@ -58,7 +58,7 @@ TBC. Use the [tutorials](./sandpit/) as a guide for now.
 
  - The original code to generate the atlas from SUNTANS output is in [this repository](https://bitbucket.org/arcoffhub/suntans-nws/src/master/)
 
- - A paper has been submitted to *JGR-Oceans* outlining the harmonic model details
+ - A paper has been submitted to *JGR-Oceans* outlining the harmonic model details. A [preprint is here](https://www.essoar.org/doi/10.1002/essoar.10504834.1)
   
 
 ---
