@@ -21,13 +21,9 @@ Potential uses:
 
 # Tutorials 
 
-An interactive tutorial is available to play with on binder:
-
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/mrayson/iwatlas/master?filepath=sandpit%2Ftutorial_iwatlas_basics.ipynb)
-
-A more thorough overview of the tools are available in this notebook:
-
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/mrayson/iwatlas/master?filepath=sandpit%2Ftest_all_iwatlas_routines.ipynb)
+1. An interactive tutorial is available to play with on binder: [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/mrayson/iwatlas/master?filepath=sandpit%2Ftutorial_iwatlas_basics.ipynb)
+2. A more thorough overview of the tools are available in this notebook: [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/mrayson/iwatlas/master?filepath=sandpit%2Ftest_all_iwatlas_routines.ipynb)
+3. Example of how to make surface baroclinic velocity predictions: [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/mrayson/iwatlas/master?filepath=sandpit%2Ftutorial_iwatlas_velocity_prediction.ipynb)
 
 (Note that the [binder](https://mybinder.org/) computing instance will likely run out of memory for this example.)
 
@@ -52,13 +48,13 @@ TBC. Use the [tutorials](./sandpit/) as a guide for now.
 
 ## Downloads
 
- - The data is available [here in a netcdf file](https://cloudstor.aarnet.edu.au/plus/s/vdksw5WKFOTO0nD).
+ - The data is available [here in a netcdf file](https://research-repository.uwa.edu.au/files/93942498/NWS_2km_GLORYS_hex_2013_2014_InternalWave_Atlas.nc).
 
 ## Background
 
  - The original code to generate the atlas from SUNTANS output is in [this repository](https://bitbucket.org/arcoffhub/suntans-nws/src/master/)
 
- - A paper has been submitted to *JGR-Oceans* outlining the harmonic model details. A [preprint is here](https://www.essoar.org/doi/10.1002/essoar.10504834.1)
+ - A paper has been submitted to *JGR-Oceans* outlining the harmonic model details. A [preprint is here](https://www.essoar.org/doi/abs/10.1002/essoar.10507151.1)
   
 
 ---
