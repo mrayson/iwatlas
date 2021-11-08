@@ -27,6 +27,7 @@ import numpy as np
 import pandas as pd
 
 from sfoda.utils.harmonic_analysis import harmonic_fit_array
+from sfoda.utils.othertime import SecondsSince
 
 
 ## Functions (to go into iwatlas module)
