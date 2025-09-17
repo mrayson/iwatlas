@@ -1,3 +1,4 @@
-git+git://github.com/mrayson/sfoda@v0.0.4#egg=sfoda
-git+git://github.com/mrayson/iwaves@v0.4.0#egg=iwaves
+git+git://github.com/mrayson/sfoda@nogdal_nocython#egg=sfoda
+git+git://github.com/mrayson/iwaves@v0.4.1#egg=iwaves
+git+git://github.com/pyTMD/pyTMD.git@2.2.7
 

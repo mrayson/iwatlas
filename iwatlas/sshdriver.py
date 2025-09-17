@@ -10,10 +10,36 @@ from scipy.interpolate import RectBivariateSpline
 
 
 from sfoda.suntans.sunxray import Sunxray
-from sfoda.utils.myproj import MyProj
+from sfoda.utils.myproj import MyProjOld as MyProj
+
+try:
+    import pyTMD
+except ImportError:
+    print('pyTMD not found, nodal corrections will not work. Set nodal=False for predictions')
+    
+try:
+    import timescale
+except ImportError:
+    print('timescale not found, nodal corrections will not work. Set nodal=False for predictions')
 
 from . import harmonics
 from .filter2d import dff2d
+
+
+def get_constits(sun_ds):
+    # Get the central frequencies
+    n_params = sun_ds.Nparams.shape[0]
+    freq_central = sun_ds.omega[n_params//2::n_params]
+    
+    # Get the FES/TMD constituent names and frequencies
+    tmd_constits = harmonics.get_fes_constituents()
+    omega_tmd = pyTMD.arguments.frequency(tmd_constits)
+    
+    # Get the names of the central frequencies
+    matching_indices = [np.where(np.isclose(omega_tmd, cf, atol=1e-6))[0][0] for cf in freq_central]
+    ssh_constits_str = [tmd_constits[i] for i in matching_indices]
+    ssh_constits_str_full = [item for item in ssh_constits_str for _ in range(n_params)]
+    return ssh_constits_str_full
 
 def load_ssh_clim(sshfile):
     """
@@ -43,7 +69,7 @@ def load_ssh_clim(sshfile):
         raise Exception('Unknown type {}'.format(type(sshfile)))
 
 
-def extract_hc_ssh(sshfile, x,y, sun=None, kind='linear'):
+def extract_hc_ssh(sshfile, x, y, sun=None, kind='linear', nodal=False):
     """
     Extract harmonic consituents from the internal tide SSH atlas
     """
@@ -52,6 +78,11 @@ def extract_hc_ssh(sshfile, x,y, sun=None, kind='linear'):
     sun = load_ssh_clim(sshfile)
     
     ntide = sun._ds.Ntide.shape[0]
+    
+    if nodal:
+        ssh_constits = get_constits(sun._ds)
+    else:
+        ssh_constits = None
 
     if isinstance(x, float):
         aa = np.zeros((1,))
@@ -69,16 +100,20 @@ def extract_hc_ssh(sshfile, x,y, sun=None, kind='linear'):
         Aa[ii,...] = sun.interpolate(sun._ds.SSH_BC_Aa.values[ii,:], x,y, kind=kind)
         Ba[ii,...] = sun.interpolate(sun._ds.SSH_BC_Ba.values[ii,:], x,y, kind=kind)
         
-    return aa, Aa, Ba, sun._ds.omega.values
+    return aa, Aa, Ba, sun._ds.omega.values, ssh_constits
 
-def predict_ssh(sshfile, x, y, time, kind='linear'):
+
+def predict_ssh(sshfile, x, y, time, kind='linear', nodal=True):
     """
     Perform harmonic predictions at the points in x and y
     """
-    
-    aa, Aa, Ba, frq = extract_hc_ssh(sshfile, x,y,kind=kind)
-    
-    return predict_scalar(time, aa, Aa, Ba, frq)
+    if nodal:
+        if np.ndim(x) > 0:
+            raise Exception('Nodal corrections not supported for array inputs yet')
+        
+    aa, Aa, Ba, frq, constits = extract_hc_ssh(sshfile, x, y, kind=kind, nodal=nodal)
+
+    return predict_scalar(time, aa, Aa, Ba, frq, nodal=nodal, constituents=constits)
     
 
 def extract_amp_nonstat(sshfile, xpt, ypt, time, kind='linear'):
@@ -87,20 +122,28 @@ def extract_amp_nonstat(sshfile, xpt, ypt, time, kind='linear'):
     """
     sshobj = load_ssh_clim(sshfile)
 
-
     basetime = np.datetime64(sshobj._ds.attrs['ReferenceDate'])
     tsec = (time - basetime).astype('timedelta64[s]').astype(float)
     
-    aa, Aa, Ba, omega = extract_hc_ssh(sshobj, xpt, ypt, kind=kind)
+    aa, Aa, Ba, omega, _ = extract_hc_ssh(sshobj, xpt, ypt, kind=kind)
     
     na = sshobj._ds.attrs['Number_Annual_Harmonics']
     ntide = sshobj._ds.dims['Ntide']//(2*na+1)
 
-    alpha_hat, beta_hat, alpha_tilde, beta_tilde =\
-        harmonics.harmonic_to_seasonal(Aa, Ba, na, ntide)
+    # if nodal:
+    #     Aa, Ba = harmonics.nodal_correction(Aa.T, Ba.T, tsec, constits)
 
-    A_re, A_im = harmonics.seasonal_amp(alpha_hat, beta_hat, alpha_tilde, beta_tilde, tsec )
-    
+    alpha_hat, beta_hat, alpha_tilde, beta_tilde =\
+                                        harmonics.harmonic_to_seasonal(Aa, Ba, na, ntide)
+    # if nodal:
+    #     alpha_hat = np.moveaxis(alpha_hat, -1, -2)
+    #     beta_hat = np.moveaxis(beta_hat, -1, -2)
+    #     alpha_tilde = np.moveaxis(alpha_tilde, -1, -2)
+    #     beta_tilde = np.moveaxis(beta_tilde, -1, -2)
+    # print(alpha_hat.shape)
+
+    A_re, A_im = harmonics.seasonal_amp(alpha_hat, beta_hat, alpha_tilde, beta_tilde, tsec)
+
     return A_re, A_im
 
 def extract_nonstat(sshfile, Aa, Ba, time, kind='linear'):
@@ -172,7 +215,6 @@ def extract_amp_dff(sshfile, xlims, ylims, dx,
         A_re_f[nn,...] = z_f.real
         A_im_f[nn,...] = z_f.imag
             
-    
     return A_re_f, A_im_f, A_re, A_im, X, Y, omega
 
 def extract_ssh_point_dff(sshfile, x0, y0, timeout, thetalow, thetahigh, 
@@ -326,7 +368,7 @@ def return_zcoord_3d(sshfile, xpt, ypt, nt, nz, scoord=None, rfac=1.04):
 
 ###
 # Generic routines
-def extract_amp_xy(sshfile, x, y, aain, Aain, Bain, kind='linear'):
+def extract_amp_xy(sshfile, x, y, aain, Aain, Bain, kind='linear', nodal=False):
     """
     Extract harmonic consituents from the internal tide SSH atlas
     """
@@ -335,6 +377,11 @@ def extract_amp_xy(sshfile, x, y, aain, Aain, Bain, kind='linear'):
     sun = load_ssh_clim(sshfile)
     
     ntide = sun._ds.Ntide.shape[0]
+    
+    if nodal:
+        ssh_constits = get_constits(sun._ds)
+    else:
+        ssh_constits = None
 
     if isinstance(x, float):
         aa = np.zeros((1,))
@@ -352,9 +399,10 @@ def extract_amp_xy(sshfile, x, y, aain, Aain, Bain, kind='linear'):
         Aa[ii,...] = sun.interpolate(Aain[ii,:], x,y, kind=kind)
         Ba[ii,...] = sun.interpolate(Bain[ii,:], x,y, kind=kind)
         
-    return aa, Aa, Ba, sun._ds.omega.values
-
-def predict_scalar(time, aa, Aa, Ba, frq):
+    return aa, Aa, Ba, sun._ds.omega.values, ssh_constits
+    
+    
+def predict_scalar(time, aa, Aa, Ba, frq, nodal=False, constituents=None):
     """
     Perform harmonic predictions at the points in x and y
     """
@@ -377,7 +425,7 @@ def predict_scalar(time, aa, Aa, Ba, frq):
             raise Exception('unsupported number of dimension in x matrix')
     
     # Do the actual prediction
-    return  harmonics.harmonic_pred(aa, Aa, Ba, frq, tsec)
+    return harmonics.harmonic_pred(aa, Aa, Ba, frq, tsec, nodal=nodal, constituents=constituents)
 
 def extract_dff(A_re, A_im, X, Y, dx, thetalow, thetahigh):
     """

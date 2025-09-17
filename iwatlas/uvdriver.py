@@ -60,10 +60,14 @@ def extract_hc_uv_spatial(sshfile):
         
     return u, v, omega
 
-def predict_uv(sshfile, x, y, time, kind='linear'):
+def predict_uv(sshfile, x, y, time, kind='linear', nodal=True):
     """
     Perform harmonic predictions of the u/v velocity amplitude at the points in x and y and time
     """
+    if nodal:
+        if np.ndim(x) > 0:
+            raise Exception('Nodal corrections not supported for array inputs yet')
+        
     ssh = sshdriver.load_ssh_clim(sshfile)
     
     # Calculate complex velocity amplitudes from ssh
@@ -73,24 +77,28 @@ def predict_uv(sshfile, x, y, time, kind='linear'):
     a0 = np.zeros((ssh.Nc,))
     
     # Interpolate the amplitudes in space and reconstruct the time-series
-    aa, Aa, Ba, frq = sshdriver.extract_amp_xy(ssh, x, y, a0, np.real(u), np.imag(u), kind=kind )
-    ut = sshdriver.predict_scalar( time, aa, Aa, Ba, omega)
+    aa, Aa, Ba, frq, constits = sshdriver.extract_amp_xy(ssh, x, y, a0, np.real(u), np.imag(u),
+                                                         kind=kind, nodal=nodal)
+    ut = sshdriver.predict_scalar(time, aa, Aa, Ba, omega, nodal=nodal, constituents=constits)
 
-    aa, Aa, Ba, frq = sshdriver.extract_amp_xy(ssh, x, y, a0, np.real(v), np.imag(v), kind=kind )
-    vt = sshdriver.predict_scalar( time, aa, Aa, Ba, omega)
+    aa, Aa, Ba, frq, constits  = sshdriver.extract_amp_xy(ssh, x, y, a0, np.real(v), np.imag(v),
+                                                          kind=kind, nodal=nodal)
+    vt = sshdriver.predict_scalar(time, aa, Aa, Ba, omega, nodal=nodal, constituents=constits)
     
     return ut, vt
 
-def predict_uv_z(sshfile, x, y, time, nz=80, mode=0, kind='linear'):
+def predict_uv_z(sshfile, x, y, time, nz=80, mode=0, kind='linear', nodal=True):
     """
     Predict the full-depth profile velocity
     """
     
     ssh = sshdriver.load_ssh_clim(sshfile)
     
-    ut, vt = predict_uv(ssh, x, y, time, kind=kind)
+    ut, vt = predict_uv(ssh, x, y, time, kind=kind, nodal=nodal)
 
     # Only compute N^2 at a few time steps
+    if nodal:
+        x, y = np.array([x]), np.array([y])
     N2_z, zout = strat.predict_N2(ssh, x, y, time, nz)
     
     # Mode shapes

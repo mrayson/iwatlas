@@ -1,0 +1,8 @@
+Metadata-Version: 2.1
+Name: iwatlas
+Version: 0.0.1
+Summary: Internal Wave climatological atlas driver routines
+Author: Matt Rayson
+Author-email: matt.rayson@uwa.edu.au
+License: LICENSE
+License-File: LICENSE

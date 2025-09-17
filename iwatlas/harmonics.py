@@ -29,19 +29,61 @@ import pandas as pd
 from sfoda.utils.harmonic_analysis import harmonic_fit_array
 from sfoda.utils.othertime import SecondsSince
 
+try:
+    import pyTMD
+except:
+    print('pyTMD not found, nodal corrections will not work. Set nodal=False for predictions')
+    
+try:
+    import timescale
+except:
+    print('timescale not found, nodal corrections will not work. Set nodal=False for predictions')
 
 ## Functions (to go into iwatlas module)
 twopi = 2*np.pi
 tdaysec = 86400.
 
-def harmonic_pred(aa, Aa, Ba, omega, tdays):
+# ## Hardcode the Madden Julien Day for corrections
+# mjd_fit = 56658
+
+
+def nodal_correction(Aa, Ba, tseconds, constituents):
+    # Get the mean nodal correction for the fitting period (nodal corrections at 01-01-2014)
+    ts_mean = timescale.from_deltatime(np.arange(1)*timescale.time._to_sec['day'], epoch=(2014,1,1,0,0,0))
+    pu_fit, pf_fit, G_fit = pyTMD.arguments.arguments(ts_mean.MJD, constituents=constituents, corrections="FES")
+    
+    time_numpy = tseconds.astype('timedelta64[s]') + np.datetime64('1990-01-01 00:00:00')
+    time_mjd = timescale.from_datetime(time_numpy).MJD
+
+    # Get the prediction nodal corrections
+    pu, pf, G = pyTMD.arguments.arguments(np.squeeze(time_mjd), constituents=constituents, corrections="FES")
+    
+    pf_rel = pf / pf_fit
+    pu_rel = pu - pu_fit   # in radians
+
+    cosu = np.cos(pu_rel)
+    sinu = np.sin(pu_rel)
+
+    Ba_prime = pf_rel * (Ba.T * cosu + Aa.T * sinu)
+    Aa_prime = pf_rel * (Aa.T * cosu - Ba.T * sinu)
+    return Aa_prime.T, Ba_prime.T
+
+
+def harmonic_pred(aa, Aa, Ba, omega, tseconds, nodal=False, constituents=None):
+    # tdays should be called tseconds
     nomega = len(omega)
-    nt = tdays.shape[0]
-    amp = np.ones_like(tdays) * aa
+    nt = tseconds.shape[0]
+    amp = np.ones_like(tseconds) * aa
+    
+    if nodal:
+        assert len(omega) == len(constituents) 
+        Aa, Ba = nodal_correction(Aa, Ba, tseconds, constituents)
+        
     for ii in range(nomega):
-        amp += Aa[ii,...]*np.cos(omega[ii]*tdays) + Ba[ii,...]*np.sin(omega[ii]*tdays)
+        amp += Aa[ii,...]*np.cos(omega[ii]*tseconds) + Ba[ii,...]*np.sin(omega[ii]*tseconds)
     
     return amp
+
 
 def nonstat_harmonic_fit(X, t, omega, na, omega_A=twopi/(365*tdaysec)):
     frq_all =[]
@@ -86,6 +128,7 @@ def harmonic_to_seasonal(Aa, Ba, na, ntide):
             beta_tilde[ff,n,...] = Aa[ii-n,...]-Aa[ii+n,...]  
     
     return alpha_hat, beta_hat, alpha_tilde, beta_tilde
+
 
 def seasonal_amp(a_hat, b_hat, a_tilde, b_tilde, t, omega_A=twopi/(365*tdaysec)):
     """
@@ -197,3 +240,41 @@ def lowfreq_harmonic_fit(Aa, Ba, tseclow, frqlow, frq, tsec):
     return Aa_pred, Ba_pred 
 
   
+def get_fes_constituents():
+    default_fes_constituents = [
+        "2n2",
+        "eps2",
+        "j1",
+        "k1",
+        "k2",
+        "l2",
+        "lambda2",
+        "m2",
+        "m3",
+        "m4",
+        "m6",
+        "m8",
+        "mf",
+        "mks2",
+        "mm",
+        "mn4",
+        "ms4",
+        "msf",
+        "msqm",
+        "mtm",
+        "mu2",
+        "n2",
+        "n4",
+        "nu2",
+        "o1",
+        "p1",
+        "q1",
+        "r2",
+        "s1",
+        "s2",
+        "s4",
+        "sa",
+        "ssa",
+        "t2",
+    ]
+    return default_fes_constituents
